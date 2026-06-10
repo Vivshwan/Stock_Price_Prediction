@@ -26,7 +26,7 @@ The project uses Python and the following libraries:
 
 ## Setup
 
-1. Open PowerShell in the project root (`d:\Stock price prediction`).
+1. Open PowerShell in the project root .
 2. Activate the existing virtual environment:
 
 ```powershell
@@ -63,4 +63,4 @@ Then open the provided local URL in your browser.
 pip install -r requirements.txt
 ```
 
-- If the app cannot find data, confirm `TSLA.csv` is in `d:\Stock price prediction`.
+- If the app cannot find data, confirm `TSLA.csv` is in root directory.
