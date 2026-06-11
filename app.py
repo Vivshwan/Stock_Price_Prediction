@@ -344,7 +344,7 @@ def main():
         """)
         
         st.markdown("---")
-        st.caption("⚠️ **Disclaimer:** This tool is for educational purposes only. Not financial advice.")
+        #st.caption("⚠️ **Disclaimer:** This tool is for educational purposes only. Not financial advice.")
     
     # Main content area
     # Calculate metrics
