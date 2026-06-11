@@ -491,24 +491,24 @@ def main():
                 st.error(f"Prediction failed: {str(e)}")
                 st.info("Please check if your model file is valid and compatible.")
     
-    # Recent data table
+    # Dataset download section
     st.markdown("---")
-    st.markdown("### 📋 Recent Historical Data")
+    st.markdown("### 📥 Download Dataset")
     
-    # Create styled dataframe
-    recent_df = df.tail(10)[["Adj Close"]].copy()
-    recent_df.index = recent_df.index.strftime('%Y-%m-%d')
-    recent_df.columns = ["Adjusted Close Price"]
-    
-    # Add change column
-    recent_df["Change %"] = df["Adj Close"].tail(10).pct_change().mul(100).round(2)
-    
-    # Display dataframe with custom styling
-    st.dataframe(
-        recent_df,
-        use_container_width=True,
-        height=400
-    )
+    # Provide download link for the CSV file
+    if os.path.exists(CSV_PATH):
+        with open(CSV_PATH, "rb") as file:
+            csv_data = file.read()
+        st.download_button(
+            label="📊 Download TSLA.csv",
+            data=csv_data,
+            file_name="TSLA.csv",
+            mime="text/csv",
+            help="Download the complete Tesla stock historical dataset"
+        )
+        st.info(f"✅ Dataset loaded: `{CSV_PATH}` ({len(df)} trading days)")
+    else:
+        st.error(f"❌ Dataset not found: `{CSV_PATH}`")
     
     # Footer with model information
     st.markdown("""
