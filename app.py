@@ -419,80 +419,77 @@ def main():
     
     # Interactive chart
     st.markdown("---")
-    chart_col1, chart_col2 = st.columns([3, 1])
+    st.markdown("### 📊 Stock Price Analysis")
+    fig = create_price_chart(df, None, None)
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Prediction section directly below the chart
+    st.markdown("---")
+    st.markdown("### 🎯 Prediction Center")
+    st.markdown("Ready to forecast the next closing price?")
     
-    with chart_col1:
-        st.markdown("### 📊 Stock Price Analysis")
-        # Display chart without prediction initially
-        fig = create_price_chart(df, None, None)
-        st.plotly_chart(fig, use_container_width=True)
+    # Data sufficiency check
+    if len(df) < window_size + 1:
+        st.warning(f"⚠️ Insufficient data for {window_size}-day window")
+        st.error(f"Need {window_size + 1} days, have {len(df)} days")
+        return
     
-    with chart_col2:
-        st.markdown("### 🎯 Prediction Center")
-        st.markdown("Ready to forecast the next closing price?")
-        
-        # Data sufficiency check
-        if len(df) < window_size + 1:
-            st.warning(f"⚠️ Insufficient data for {window_size}-day window")
-            st.error(f"Need {window_size + 1} days, have {len(df)} days")
-            return
-        
-        # Prediction button
-        if st.button("🔮 **Predict Future Close Prices**", use_container_width=True):
-            with st.spinner("🧠 AI is analyzing market patterns..."):
-                try:
-                    # Load model and make prediction
-                    model = load_keras_model(model_files[model_name])
-                    input_window, scaler, target_df = prepare_prediction_input(df, window_size=window_size)
-                    predicted_values = predict_future_values(
-                        model,
-                        input_window,
-                        scaler,
-                        forecast_horizon=forecast_horizon,
-                    )
+    # Prediction button
+    if st.button("🔮 **Predict Future Close Prices**", use_container_width=True):
+        with st.spinner("🧠 AI is analyzing market patterns..."):
+            try:
+                # Load model and make prediction
+                model = load_keras_model(model_files[model_name])
+                input_window, scaler, target_df = prepare_prediction_input(df, window_size=window_size)
+                predicted_values = predict_future_values(
+                    model,
+                    input_window,
+                    scaler,
+                    forecast_horizon=forecast_horizon,
+                )
 
-                    # Build predicted series with future dates
-                    forecast_dates = [
-                        target_df.index[-1] + pd.Timedelta(days=i)
-                        for i in range(1, forecast_horizon + 1)
-                    ]
-                    predicted_series = pd.Series(predicted_values, index=forecast_dates)
+                # Build predicted series with future dates
+                forecast_dates = [
+                    target_df.index[-1] + pd.Timedelta(days=i)
+                    for i in range(1, forecast_horizon + 1)
+                ]
+                predicted_series = pd.Series(predicted_values, index=forecast_dates)
 
-                    # Display prediction summary card
-                    st.markdown(f"""
-                    <div class="prediction-card">
-                        <h3>📊 Predicted Close Prices</h3>
-                        <div class="prediction-value">{predicted_series.iloc[0]:,.2f} → {predicted_series.iloc[-1]:,.2f}</div>
-                        <p>Forecast for <strong>{forecast_horizon}</strong> days using <strong>{model_name}</strong></p>
-                    </div>
-                    """, unsafe_allow_html=True)
+                # Display prediction summary card
+                st.markdown(f"""
+                <div class="prediction-card">
+                    <h3>📊 Predicted Close Prices</h3>
+                    <div class="prediction-value">{predicted_series.iloc[0]:,.2f} → {predicted_series.iloc[-1]:,.2f}</div>
+                    <p>Forecast for <strong>{forecast_horizon}</strong> days using <strong>{model_name}</strong></p>
+                </div>
+                """, unsafe_allow_html=True)
 
-                    # Show trend summary
-                    price_diff = predicted_series.iloc[-1] - metrics['latest_price']
-                    diff_pct = (price_diff / metrics['latest_price']) * 100
+                # Show trend summary
+                price_diff = predicted_series.iloc[-1] - metrics['latest_price']
+                diff_pct = (price_diff / metrics['latest_price']) * 100
 
-                    if price_diff > 0:
-                        st.success(f"📈 Forecast trend up by ${price_diff:.2f} ({diff_pct:.2f}%)")
-                    elif price_diff < 0:
-                        st.error(f"📉 Forecast trend down by ${abs(price_diff):.2f} ({abs(diff_pct):.2f}%)")
-                    else:
-                        st.info("📊 Forecast trend remains flat")
+                if price_diff > 0:
+                    st.success(f"📈 Forecast trend up by ${price_diff:.2f} ({diff_pct:.2f}%)")
+                elif price_diff < 0:
+                    st.error(f"📉 Forecast trend down by ${abs(price_diff):.2f} ({abs(diff_pct):.2f}%)")
+                else:
+                    st.info("📊 Forecast trend remains flat")
 
-                    # Show full forecast table
-                    forecast_df = pd.DataFrame({
-                        "Forecast Date": predicted_series.index.strftime('%Y-%m-%d'),
-                        "Predicted Close": predicted_series.values,
-                    })
-                    st.table(forecast_df.assign(**{"Predicted Close": forecast_df["Predicted Close"].map("${:,.2f}".format)}))
+                # Show full forecast table
+                forecast_df = pd.DataFrame({
+                    "Forecast Date": predicted_series.index.strftime('%Y-%m-%d'),
+                    "Predicted Close": predicted_series.values,
+                })
+                st.table(forecast_df.assign(**{"Predicted Close": forecast_df["Predicted Close"].map("${:,.2f}".format)}))
 
-                    # Update chart with prediction
-                    historical_window = target_df[-window_size:]
-                    updated_fig = create_price_chart(df, historical_window, predicted_series)
-                    st.plotly_chart(updated_fig, use_container_width=True)
+                # Update chart with prediction
+                historical_window = target_df[-window_size:]
+                updated_fig = create_price_chart(df, historical_window, predicted_series)
+                st.plotly_chart(updated_fig, use_container_width=True)
 
-                except Exception as e:
-                    st.error(f"Prediction failed: {str(e)}")
-                    st.info("Please check if your model file is valid and compatible.")
+            except Exception as e:
+                st.error(f"Prediction failed: {str(e)}")
+                st.info("Please check if your model file is valid and compatible.")
     
     # Recent data table
     st.markdown("---")
