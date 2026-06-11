@@ -512,20 +512,8 @@ def main():
     
     # Footer with model information
     st.markdown("""
-    <div class="footer">
-        <h5>🤖 Available Models</h5>
-    """, unsafe_allow_html=True)
-    
-    # Display available models in columns
-    model_cols = st.columns(min(len(model_files), 4))
-    for idx, model in enumerate(list(model_files.keys())[:4]):
-        with model_cols[idx % len(model_cols)]:
-            st.markdown(f"✅ `{model}`")
-    
-    st.markdown("""
     <hr>
     <small>Built with Streamlit • TensorFlow • Tesla Stock Data</small>
-    </div>
     """, unsafe_allow_html=True)
 
 
