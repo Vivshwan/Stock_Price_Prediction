@@ -2,9 +2,12 @@
 # SECTION 1: IMPORTING REQUIRED LIBRARIES
 # ===========================================
 
+import json
 import os  # For file and directory operations (checking model files, paths)
+import sqlite3
+from datetime import datetime
+from pathlib import Path
 from typing import Dict  # For type hints (specifies dictionary return type)
-from datetime import datetime, timedelta  # For handling date calculations in forecasts
 
 import numpy as np  # For numerical operations on arrays
 import pandas as pd  # For data manipulation and DataFrame operations
@@ -13,6 +16,8 @@ import tensorflow as tf  # Deep learning framework for loading and running model
 from tensorflow.keras.models import load_model  # Specifically for loading saved Keras models
 import plotly.graph_objects as go  # For creating interactive charts (Plotly)
 from plotly.subplots import make_subplots  # For creating multiple subplots in one figure
+
+from forecast_store import DEFAULT_DATABASE, HISTORY_PAGE_SIZE, MAX_PASSWORD_LENGTH, ForecastStore
 
 # Import preprocessing functions from external module
 from tsla_preprocessing import (
@@ -137,6 +142,82 @@ st.markdown("""
 # ===========================================
 # SECTION 4: HELPER FUNCTIONS
 # ===========================================
+
+@st.cache_resource
+def get_forecast_store(database_path: str) -> ForecastStore:
+    return ForecastStore(Path(database_path).expanduser().resolve())
+
+
+def account_panel(store: ForecastStore) -> tuple[int, str] | None:
+    st.subheader("Account")
+    account = st.session_state.get("forecast_account")
+    if account is not None:
+        st.text(f"Signed in as {account[1]}")
+        if st.button("Sign out"):
+            st.session_state.pop("forecast_account")
+            st.session_state.pop("forecast_history_page", None)
+            st.rerun()
+        return account
+
+    mode = st.radio("Account access", ("Sign in", "Create account"), horizontal=True)
+    with st.form(f"account_{mode}", clear_on_submit=True):
+        email = st.text_input("Email", max_chars=254)
+        password = st.text_input("Password", type="password", max_chars=MAX_PASSWORD_LENGTH)
+        if mode == "Create account":
+            st.caption("Use at least 12 characters.")
+        submitted = st.form_submit_button(mode)
+
+    if submitted:
+        try:
+            if mode == "Create account":
+                account = store.register(email, password)
+            else:
+                account = store.authenticate(email, password)
+        except ValueError as error:
+            st.error(str(error))
+        except sqlite3.Error:
+            st.error("The accounts database is unavailable. Try again in a moment.")
+        else:
+            if account is None:
+                st.error("Incorrect email or password.")
+            else:
+                st.session_state["forecast_account"] = account
+                st.rerun()
+    return None
+
+
+def show_forecast_history(store: ForecastStore, user_id: int) -> None:
+    st.subheader("Forecast history")
+    page = st.session_state.get("forecast_history_page", 0)
+    try:
+        runs = store.history(user_id, page)
+    except sqlite3.Error:
+        st.error("Forecast history is temporarily unavailable.")
+        return
+
+    if not runs and page == 0:
+        st.info("Your forecasts will appear here after you run them while signed in.")
+        return
+
+    for run in runs[:HISTORY_PAGE_SIZE]:
+        timestamp = datetime.fromisoformat(run["created_at"]).strftime("%Y-%m-%d %H:%M:%S UTC")
+        title = f'{run["symbol"]} · {run["model"]} · {timestamp}'
+        with st.expander(title):
+            st.caption(f'{run["lookback"]}-day lookback · {run["horizon"]}-day forecast')
+            points = json.loads(run["points"])
+            st.table(pd.DataFrame({
+                "Forecast Date": [date for date, _ in points],
+                "Predicted Close": [f"${price:,.2f}" for _, price in points],
+            }))
+
+    newer, older = st.columns(2)
+    if newer.button("Newer forecasts", disabled=page == 0):
+        st.session_state["forecast_history_page"] = page - 1
+        st.rerun()
+    if older.button("Older forecasts", disabled=len(runs) <= HISTORY_PAGE_SIZE):
+        st.session_state["forecast_history_page"] = page + 1
+        st.rerun()
+
 
 def get_model_files(model_dir: str) -> Dict[str, str]:
     """
@@ -462,6 +543,27 @@ def main():
         <p style="font-size: 1.2rem; opacity: 0.9;">AI-powered predictions using Deep Learning (LSTM/SimpleRNN)</p>
     </div>
     """, unsafe_allow_html=True)
+
+    database_path = os.environ.get("FORECAST_DATABASE_PATH") or str(DEFAULT_DATABASE)
+    store = None
+    account = None
+    page = "Dashboard"
+    with st.sidebar:
+        try:
+            store = get_forecast_store(database_path)
+        except (OSError, sqlite3.Error):
+            st.error("The accounts database is unavailable. Check the database path and permissions.")
+        else:
+            account = account_panel(store)
+            if account is None:
+                st.caption("Sign in to save your forecasts and view your history.")
+            else:
+                page = st.radio("View", ("Dashboard", "Forecast history"))
+        st.divider()
+
+    if page == "Forecast history":
+        show_forecast_history(store, account[0])
+        return
     
     # ===== SIDEBAR CONFIGURATION =====
     with st.sidebar:
@@ -627,6 +729,18 @@ def main():
                     for i in range(1, forecast_horizon + 1)
                 ]
                 predicted_series = pd.Series(predicted_values, index=forecast_dates)
+
+                if account is not None:
+                    points = [
+                        (date.strftime("%Y-%m-%d"), float(price))
+                        for date, price in predicted_series.items()
+                    ]
+                    try:
+                        store.save_forecast(account[0], "TSLA", model_name, window_size, points)
+                    except (sqlite3.Error, ValueError):
+                        st.warning("The forecast was generated, but it could not be saved to your history.")
+                    else:
+                        st.toast("Forecast saved to your history.")
 
                 # ===== DISPLAY PREDICTION RESULTS =====
                 # Large prediction card
