@@ -1,79 +1,65 @@
 # Tesla Stock Price Forecast
 
-A Streamlit app for Tesla (`TSLA`) adjusted-close price forecasting using saved Keras models.
+A Streamlit dashboard for exploring Tesla (TSLA) stock price history and generating short-term adjusted closing price forecasts. It uses the bundled `TSLA.csv` dataset, which covers June 2010 through February 2020.
 
-## Project structure
+## Problem Statement
 
-- `app.py` - Streamlit dashboard for loading data, selecting a trained model, and predicting the next closing price.
-- `forecast_store.py` - SQLite account authentication and per-user forecast history.
-- `tsla_preprocessing.py` - Data loading, preprocessing, scaling, sequence creation, and model training utilities.
-- `TSLA.csv` - Historical Tesla stock price data used by the app.
-- `models/` - Directory containing trained model files such as `tsla_lstm.keras` and `tsla_simplernn.keras`.
-- `requirements.txt` - Python dependency list.
-- `.venv/` - Local virtual environment for the project.
+Historical price charts show how a stock has moved. This project lets learners test how LSTM and SimpleRNN models use recent adjusted closing prices to estimate subsequent values. The dashboard puts the forecasts alongside the historical series so users can inspect the model output in context.
 
-## Requirements
+## Key Features
 
-The project uses Python and the following libraries:
+- Choose between trained LSTM and SimpleRNN models and adjust the historical lookback. Start with 60 observations, the window used in training.
+- Generate a 1- to 14-day forecast. Each predicted price feeds the next step, and forecast dates advance by calendar day from the last date in the CSV.
+- Explore historical prices and forecasts on interactive charts, review price and volatility metrics, and download the source CSV.
+- Forecast as a guest or create an account to save runs. Signed-in users can open **View > Forecast history** to review the model, lookback, horizon, and predicted prices for each run.
+- Train both models locally and generate actual-versus-predicted plots for the test split.
 
-- `numpy`
-- `pandas`
-- `matplotlib`
-- `seaborn`
-- `scikit-learn`
-- `tensorflow`
-- `streamlit`
-- `plotly`
+## Tech Stack
 
-## Setup
+| Technology | Role |
+| --- | --- |
+| Python 3.13 | Runs the training pipeline and dashboard. |
+| TensorFlow 2.21.0 and Keras | Train, save, and load the LSTM and SimpleRNN models. |
+| NumPy 2.4.6 and pandas 3.0.3 | Process the historical CSV and prepare price sequences and forecast tables. |
+| scikit-learn 1.9.0 | Scales adjusted prices and calculates model evaluation metrics. |
+| Streamlit 1.58.0 and Plotly 6.8.0 | Provide dashboard controls, interactive charts, and CSV downloads. |
+| Matplotlib 3.10.9 | Saves model evaluation plots during training. |
+| SQLite | Stores local accounts and forecast history using Python's built-in `sqlite3` module. |
 
-1. Open PowerShell in the project root.
-2. Activate the existing virtual environment:
+## Setup and Build
 
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
+Install Git and Python 3.13. On Windows, use PowerShell with the Python launcher (`py`). The commands call the virtual environment's Python directly, so activation is optional.
 
-3. Install dependencies from `requirements.txt`:
+1. Clone the repository and enter the project directory. If you already have a checkout, open its root directory, where `app.py` and `TSLA.csv` are located.
 
-```powershell
-pip install -r requirements.txt
-```
+   ```powershell
+   git clone https://github.com/Vivshwan/Stock_Price_Prediction.git
+   Set-Location Stock_Price_Prediction
+   ```
 
-## Run the Streamlit app
+2. Create a virtual environment and install the pinned dependencies.
 
-Execute:
+   ```powershell
+   py -3.13 -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+   ```
 
-```powershell
-streamlit run app.py
-```
+3. Optionally retrain the models. This repository includes `models/tsla_lstm.keras` and `models/tsla_simplernn.keras`, so you can go straight to **Run** after installing the dependencies. To regenerate the models and evaluation plots, use the training command below.
 
-Then open the provided local URL in your browser.
+   ```powershell
+   .\.venv\Scripts\python.exe tsla_preprocessing.py
+   ```
 
-## Accounts and forecast history
+   The script reads `TSLA.csv` and writes both `.keras` files and their evaluation plots to `models/`. The Streamlit app requires no separate compilation step.
 
-Use **Create account** in the sidebar to register with an email and a password of at least 12 characters. Returning users select **Sign in**. Each forecast you run while signed in appears under **View → Forecast history**, with its model, lookback window, forecast horizon, and daily predicted prices. Select **Sign out** to end your session. Guest forecasting is available without saving history.
+The app creates `forecast_accounts.sqlite3` in the project directory. To store it somewhere else, set `FORECAST_DATABASE_PATH` to a file path in an existing writable directory before launching the app.
 
-The app creates `forecast_accounts.sqlite3` in the project root on first run. SQLite stores account email addresses, salted password hashes, and forecast history. To use an existing SQLite database or another location, set `FORECAST_DATABASE_PATH` before starting Streamlit. The parent directory must exist and be writable by the app. The app creates the `forecast_users` and `forecast_runs` tables if needed.
+## Run
 
-```powershell
-$env:FORECAST_DATABASE_PATH = 'D:\data\forecast_accounts.sqlite3'
-streamlit run app.py
-```
-
-## Notes
-
-- Make sure `TSLA.csv` is present in the project root.
-- Make sure your `models/` directory contains trained `.keras` or `.h5` model files.
-- If you need to retrain models, use `tsla_preprocessing.py` as a reference for data preprocessing and training.
-
-## Troubleshooting
-
-- If the app fails due to missing dependencies, reinstall with:
+From the project root, start the dashboard.
 
 ```powershell
-pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-- If the existing `.venv` was copied from another location and fails to start, create a fresh virtual environment using Python 3.13 and reinstall the requirements into it.
-- If the app cannot find data, start Streamlit from the project root and confirm `TSLA.csv` is there.
+Open the local URL printed in the terminal, usually `http://localhost:8501`. In the sidebar, choose a model and forecast horizon, then select **Predict Future Close Prices**.
